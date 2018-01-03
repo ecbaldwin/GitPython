@@ -66,12 +66,12 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
     __slots__ = ("tree",
                  "author", "authored_date", "author_tz_offset",
                  "committer", "committed_date", "committer_tz_offset",
-                 "message", "parents", "encoding", "gpgsig")
+                 "message", "parents", "encoding", "gpgsig", "predecessors")
     _id_attribute_ = "hexsha"
 
     def __init__(self, repo, binsha, tree=None, author=None, authored_date=None, author_tz_offset=None,
                  committer=None, committed_date=None, committer_tz_offset=None,
-                 message=None, parents=None, encoding=None, gpgsig=None):
+                 message=None, parents=None, encoding=None, gpgsig=None, predecessors=None):
         """Instantiate a new Commit. All keyword arguments taking None as default will
         be implicitly set on first query.
 
@@ -101,6 +101,9 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
         :param parents:
             List or tuple of Commit objects which are our parent(s) in the commit
             dependency graph
+        :param predecessors:
+            List or tuple of Commit objects which this commit replaces after rebasing or amending
+            rewrite graph
         :return: git.Commit
 
         :note:
@@ -132,6 +135,8 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
             self.encoding = encoding
         if gpgsig is not None:
             self.gpgsig = gpgsig
+        if predecessors is not None:
+            self.predecessors = predecessors
 
     @classmethod
     def _get_intermediate_items(cls, commit):
@@ -280,7 +285,7 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
 
     @classmethod
     def create_from_tree(cls, repo, tree, message, parent_commits=None, head=False, author=None, committer=None,
-                         author_date=None, commit_date=None):
+                         author_date=None, commit_date=None, predecessors=None):
         """Commit the given tree, creating a commit object.
 
         :param repo: Repo object the commit should be part of
@@ -324,6 +329,15 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
                     raise ValueError("Parent commit '%r' must be of type %s" % (p, cls))
             # end check parent commit types
         # END if parent commits are unset
+
+        if predecessors is None:
+            predecessors=list()
+        else:
+            for p in predecessors:
+                if not isinstance(p, cls):
+                    raise ValueError("Replaced commit '%r' must be of type %s" % (p, cls))
+            # end check predecessors commit types
+        # END if predecessors commits are unset
 
         # retrieve all additional information, create a commit object, and
         # serialize it
@@ -375,7 +389,7 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
         new_commit = cls(repo, cls.NULL_BIN_SHA, tree,
                          author, author_time, author_offset,
                          committer, committer_time, committer_offset,
-                         message, parent_commits, conf_encoding)
+                         message, parent_commits, conf_encoding, predecessors=predecessors)
 
         stream = BytesIO()
         new_commit._serialize(stream)
@@ -433,6 +447,9 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
                     write((" " + sigline + "\n").encode('ascii'))
         except AttributeError:
             pass
+
+        for p in self.predecessors:
+            write(("predecessor %s\n" % p).encode('ascii'))
 
         write(b"\n")
 
