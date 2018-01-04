@@ -497,6 +497,7 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
         self.gpgsig = None
 
         # read headers
+        self.predecessors = list()
         enc = next_line
         buf = enc.strip()
         while buf:
@@ -518,6 +519,9 @@ class Commit(base.Object, Iterable, Diffable, Traversable, Serializable):
                 self.gpgsig = sig.rstrip(b"\n").decode('ascii')
                 if is_next_header:
                     continue
+            elif buf[0:12] == b"predecessor ":
+                predecessor_sha = buf[buf.find(b' ') + 1:].decode('ascii')
+                self.predecessors.append(type(self)(self.repo, hex_to_bin(predecessor_sha)))
             buf = readline().strip()
         # decode the authors name
 
