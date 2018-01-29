@@ -147,6 +147,12 @@ PROC_CREATIONFLAGS = (CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
                       else 0)
 
 
+class MissingObject(ValueError):
+    def __init__(self, sha1, *args, **kwargs):
+        super(MissingObject, self).__init__(*args, **kwargs)
+        self.sha1 = sha1
+
+
 class Git(LazyMixin):
 
     """
@@ -1023,7 +1029,7 @@ class Git(LazyMixin):
             if not tokens:
                 raise ValueError("SHA could not be resolved, git returned: %r" % (header_line.strip()))
             else:
-                raise ValueError("SHA %s could not be resolved, git returned: %r" % (tokens[0], header_line.strip()))
+                raise MissingObject(tokens[0], "SHA %s could not be resolved, git returned: %r" % (tokens[0], header_line.strip()))
             # END handle actual return value
         # END error handling
 
